@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <title>To test coordinates</title>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        #map {
+            height: 400px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1 style="text-align: center;">MY MAP</h1>
+    <form onsubmit="getCoordinates(document.getElementById('source').value, document.getElementById('destination').value); return false;">
+        <table>
+            <tr>
+                <td>Enter your Source :</td>
+                <td><input type="text" id="source" /></td>
+            </tr>
+            <tr>
+                <td>Enter your Destination :</td>
+                <td><input type="text" id="destination" /></td>
+            </tr>
+        </table>
+        <input type="submit" value="Get Coordinates">
+    </form>
+    <div id="map"></div>
+
+    <script>
+        let latitudeSource, longitudeSource, latitudeDestination, longitudeDestination;
+
+        function getCoordinates(source, destination) {
+            const urlSource = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(source)}`;
+            const urlDestination = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(destination)}`;
+
+            fetch(urlSource)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length > 0) {
+                        latitudeSource = data[0].lat;
+                        longitudeSource = data[0].lon;
+                        console.log(`Source Latitude: ${latitudeSource}, Source Longitude: ${longitudeSource}`);
+                    } else {
+                        console.error("Source Address not found");
+                    }
+                })
+                .catch(error => {
+                    console.error("Error fetching source coordinates:", error);
+                });
+
+            fetch(urlDestination)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length > 0) {
+                        latitudeDestination = data[0].lat;
+                        longitudeDestination = data[0].lon;
+                        console.log(`Destination Latitude: ${latitudeDestination}, Destination Longitude: ${longitudeDestination}`);
+                        getIntermediaryNodes(latitudeSource, longitudeSource, latitudeDestination, longitudeDestination);
+                    } else {
+                        console.error("Destination Address not found");
+                    }
+                })
+                .catch(error => {
+                    console.error("Error fetching destination coordinates:", error);
+                });
+        }
+
+        function getIntermediaryNodes(sourceLatitude, sourceLongitude, destinationLatitude, destinationLongitude) {
+            const osrmURL = `http://router.project-osrm.org/route/v1/driving/${sourceLongitude},${sourceLatitude};${destinationLongitude},${destinationLatitude}?alternatives=true&steps=true&geometries=geojson`;
+
+            fetch(osrmURL)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch routes');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    let routes = data.routes;
+
+                    if (!routes || routes.length === 0) {
+                        throw new Error('No routes found');
+                    }
+
+                    let intermediaryNodes = [];
+
+                    routes.forEach(route => {
+                        const steps = route.legs.reduce((acc, leg) => [...acc, ...leg.steps], []);
+                        steps.forEach(step => {
+                            intermediaryNodes.push({
+                                latitude: step.intersections[0].location[1],
+                                longitude: step.intersections[0].location[0],
+                                name: step.name
+                            });
+                        });
+                    });
+
+                    // Shuffle nodes
+                    intermediaryNodes = shuffleArray(intermediaryNodes);
+
+                    // Ensure source is first and destination is last
+                    intermediaryNodes.unshift({
+                        latitude: sourceLatitude,
+                        longitude: sourceLongitude,
+                        name: 'source'
+                    });
+                    intermediaryNodes = intermediaryNodes.slice(0, Math.min(10, intermediaryNodes.length));
+
+                    intermediaryNodes.push({
+                        latitude: destinationLatitude,
+                        longitude: destinationLongitude,
+                        name: 'destination'
+                    });
+
+                    // Task 1: Assign alphabets from A to Z to the intermediary nodes (excluding source and destination)
+                    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+                    for (let i = 1; i < intermediaryNodes.length - 1; i++) {
+                        intermediaryNodes[i].name = alphabet[i - 1];
+                    }
+
+                    displayIntermediaryNodes(intermediaryNodes);
+                })
+                .catch(error => {
+                    console.error("Error:", error.message);
+                });
+        }
+
+        function displayIntermediaryNodes(nodes) {
+            console.log("Intermediate Nodes:", nodes);
+            const map = L.map('map').setView([nodes[0].latitude, nodes[0].longitude], 10);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+            nodes.forEach(node => {
+                L.marker([node.latitude, node.longitude]).addTo(map).bindPopup(node.name);
+                console.log(`Latitude: ${node.latitude}, Longitude: ${node.longitude}, Name: ${node.name}`);
+            });
+            graphs = generateGraph(nodes);
+            console.log("Graphs:", graphs);
+        }
+        // Function to shuffle an array (Fisher-Yates shuffle algorithm)
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+        let graph;
+
+        function generateGraph(intermediaryNodes) {
+            graph = {};
+            for (let i = 0; i < intermediaryNodes.length; i++) {
+                const connections = [];
+                // Randomly select 2 to 3 other intermediary nodes to connect to
+                const numConnections = Math.floor(Math.random() * 2) + 2;
+                while (connections.length < numConnections) {
+                    const randomIndex = Math.floor(Math.random() * intermediaryNodes.length);
+                    if (randomIndex !== i && !connections.includes(randomIndex)) {
+                        connections.push(randomIndex);
+                    }
+                }
+                // Calculate distances and add to the graph
+                graph[intermediaryNodes[i].name] = {};
+                connections.forEach(index => {
+                    const distance = calculateDistance(
+                        intermediaryNodes[i].latitude, intermediaryNodes[i].longitude,
+                        intermediaryNodes[index].latitude, intermediaryNodes[index].longitude
+                    );
+                    graph[intermediaryNodes[i].name][intermediaryNodes[index].name] = distance;
+                });
+            }
+            return graph;
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Radius of the Earth in kilometers
+            const dLat = (lat2 - lat1) * Math.PI / 180; // Convert degrees to radians
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const distance = R * c; // Distance in kilometers
+            return distance;
+        }
+    </script>
+</body>
+
+</html>
