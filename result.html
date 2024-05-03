@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+   
+    <title>Result</title>
+</head>
+<body>
+   <div class="border">
+    <h1 style="font-family: jost , sans-serif ; text-align: center;">Result:</h1>
+    <p>Path: {{ result['path'] }}</p>
+    <p>Distance Between Source and Destination: {{ result['distance'] }} Kms</p>
+    <h2 style="font-family: jost , sans-serif ;text-align: center">Modes Of Transport:</h2>
+    <ul>
+        <li>Rental/Private Car:</li>
+        <ul>
+            <li>Sedan: {{ result['transport_options']['Rental/Private Car']['Sedan'] }}</li>
+            <li>SUV: {{ result['transport_options']['Rental/Private Car']['SUV'] }}</li>
+        </ul>
+        <li>Auto: {{ result['transport_options']['Auto'] }}</li>
+        <li>Bus Charges:</li>
+        <ul>
+            <li>Non Ac: {{ result['transport_options']['Bus']['Non Ac'] }}</li>
+            <li>Ac: {{ result['transport_options']['Bus']['Ac'] }}</li>
+        </ul>
+    </ul>
+   </div>
+</body>
+<style>
+    body {
+        font-family: jost, sans-serif;
+        
+        color: rgb(222, 198, 224);
+        
+        background-image:linear-gradient(rgba(0, 0, 0, 0.5),
+                       rgba(0, 0, 0, 0.5)), url("./h1_hero.png");
+        text-align: left;
+        margin-top: 200px;
+        background-size: cover;
+        margin-left: 500px;
+        
+        
+
+    }
+    .border{
+        border:1px solid white;
+        border-width: 3px;
+        border-radius: 10px;
+        padding: 20px;
+        width: 500px;
+        align-items: center;
+        background-color: rgba(57, 51, 51, 0.5);
+        padding-top: 0;
+
+    }
+</style>
+</html>
